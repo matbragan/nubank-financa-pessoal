@@ -3,5 +3,7 @@
 ~~~sh
 pip install -r requirements.txt
 
-streamlit run app.py
+streamlit run dashboard.py
 ~~~
+
+[Extratos de crédito](https://app.nubank.com.br/beta/credit-card/bills/)
