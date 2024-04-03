@@ -68,9 +68,14 @@ def invoice(con):
 
 
 def execute():
-    con = duckdb.connect(database='finance.db')
+    try:
+        con = duckdb.connect(database='finance.db')
+        
+        extract(con)
+        invoice(con)
+        print('Dados Atualizados com Sucesso!')
+    except Exception as e:
+        print(f'Erro ao Atualizar os Dados - {e}')
     
-    extract(con)
-    invoice(con)
-    
-    con.close()
+    if con:
+        con.close()
