@@ -12,8 +12,11 @@ st.markdown('### Após carregar e/ou excluir arquivos, clique no botão abaixo:'
 
 if st.button('Atualizar Base de Dados'):
     try:
-        resultado = subprocess.run(['python3', 'main.py'])
-        st.success('Dados Atualizados com Sucesso!', icon='✅')
+        resultado = subprocess.run(['python3', 'main.py'], capture_output=True, text=True)
+        if resultado.stderr:
+            st.error(f'Erro ao Atualizar os Dados - {resultado.stderr}', icon='❌')    
+        else:
+            st.success('Dados Atualizados com Sucesso!', icon='✅')
     except Exception as e:
         st.error(f'Erro ao Atualizar os Dados - {e}', icon='❌')
 

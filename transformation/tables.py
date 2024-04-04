@@ -25,7 +25,7 @@ def extract(con):
         select 
             id
         ,   date as data
-        ,	if(position('-' in description) > 0, left(description, position(' -' in description) - 1), description) as categoria
+        ,	if(position('-' in description) > 0, left(description, position(' -' in description) - 1), description) as tipo
         ,	value as valor
         ,	description as descricao
         from 
@@ -55,12 +55,10 @@ def invoice(con):
         select 
             date as data
         ,	category as categoria
-        ,	value as valor
-        ,	title as descricao
+        ,	value*-1 as valor
+        ,	title as titulo
         from 
             original_invoice
-        where 
-            year(date) >= 2024
         );
     """
 
@@ -68,14 +66,10 @@ def invoice(con):
 
 
 def execute():
-    try:
-        con = duckdb.connect(database='finance.db')
-        
-        extract(con)
-        invoice(con)
-        print('Dados Atualizados com Sucesso!')
-    except Exception as e:
-        print(f'Erro ao Atualizar os Dados - {e}')
+    con = duckdb.connect(database='finance.db')
+    
+    extract(con)
+    invoice(con)
     
     if con:
         con.close()
