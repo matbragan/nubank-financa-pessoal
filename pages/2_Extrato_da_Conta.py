@@ -1,28 +1,15 @@
 import streamlit as st
 import plotly.express as px
 import duckdb
-import locale
 
-def formatar_dinheiro(valor):
-    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
-    return 'R$ ' + locale.currency(valor, grouping=True, symbol=None)
+from pages.utils.paines import formatar_dinheiro, colorir_celula_investimento, colorir_celula_valor
 
-def colorir_celula_valor(valor):
-    if valor > 0:
-        return 'background-color: rgba(144, 238, 144, 0.3)'
-    else:
-        return 'background-color: rgba(255, 160, 122, 0.3)'
-    
-def colorir_celula_investimento(categoria):
-    if categoria in ('Aplicação RDB', 'Resgate RDB'):
-        return 'background-color: rgba(255, 255, 0, 0.3)'
 
 con = duckdb.connect(database='finance.db')
 
-st.set_page_config(page_title='Nubank Finança Pessoal', layout='wide')
+st.set_page_config(page_title='Extrato da Conta', layout='wide')
 
 ######################################################################
-# 1 - TABELA TOTAL MES
 
 query = """
     with aux as (
@@ -80,14 +67,14 @@ st.dataframe(df, use_container_width=True, hide_index=True,
 st.divider()
 
 col1, col2 = st.columns(2)
-col3, col4, col5 = st.columns(3)
+# col3, col4, col5 = st.columns(3)
 
 col1.markdown('### Saldos Mensais')
 col2.markdown('### Movimentações Mensais')
-col3.markdown('### Categorias')
+# col3.markdown('### Categorias')
+# col4.markdown('### Gastos Mensais')
 
 ######################################################################
-# 3 - TABELA SALDOS MENSAIS
 
 query = """
     select
@@ -119,7 +106,6 @@ col1.dataframe(style_df, use_container_width=True, hide_index=True,
                })
 
 ######################################################################
-# 4 - GRAFICO DE BARRAS MOVIMENTACOES
 
 df = df.melt(id_vars=['mes'], var_name='movimentacao', value_name='valor')
 df = df[df['movimentacao'].isin(['entrada', 'investido', 'gastos', 'saida'])]
@@ -133,30 +119,50 @@ fig = px.bar(df, x='mes', y='valor', color='movimentacao',
 col2.plotly_chart(fig)
 
 ######################################################################
-# 5 - GRAFICO DE BARRAS CATEGORIAS
+
+# query = """
+#     select
+#         date_trunc('month', data) as mes
+#     ,   categoria
+#     ,   count(*) as quantidade
+#     ,   sum(valor) as valor
+#     from 
+#         extract
+#     group by 
+#         1, 2
+# """
+
+# df = con.sql(query).fetchdf()
+# df['mes'] = df['mes'].dt.date
+
+# soma_por_categoria = df.groupby('categoria')['valor'].sum().reset_index()
+# soma_por_categoria['valor'] = soma_por_categoria['valor'].abs()
+# categorias_ordenadas = soma_por_categoria.sort_values(by='valor', ascending=False)['categoria']
+
+# fig = px.bar(df, x='mes', y='valor', color='categoria', 
+#              barmode='group', category_orders={'categoria': categorias_ordenadas})
+# col3.plotly_chart(fig)
+
+######################################################################
 
 query = """
-    select
+    select 
         date_trunc('month', data) as mes
-    ,   categoria
-    ,   count(*) as quantidade
-    ,   sum(valor) as valor
+    ,   abs(valor) as valor
     from 
         extract
-    group by 
-        1, 2
+    where
+        1=1 
+        and valor < 0
+        and descricao not in ('Aplicação RDB')
 """
 
 df = con.sql(query).fetchdf()
 df['mes'] = df['mes'].dt.date
 
-soma_por_categoria = df.groupby('categoria')['valor'].sum().reset_index()
-soma_por_categoria['valor'] = soma_por_categoria['valor'].abs()
-categorias_ordenadas = soma_por_categoria.sort_values(by='valor', ascending=False)['categoria']
-
-fig = px.bar(df, x='mes', y='valor', color='categoria', 
-             barmode='group', category_orders={'categoria': categorias_ordenadas})
-col3.plotly_chart(fig)
+st.markdown('### Distribuição dos Gastos Mensais')
+fig = px.box(df, x='mes', y='valor', color_discrete_sequence=['#FF6347'])
+st.plotly_chart(fig)
 
 ######################################################################
 
