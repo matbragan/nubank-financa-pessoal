@@ -95,7 +95,7 @@ query = """
     select
         date_trunc('month', data) as mes
     ,   sum(if(valor > 0, valor, 0)) as entrada
-    ,	abs(sum(if(descricao in ('Aplicação RDB', 'Resgate RDB'), valor, 0))) as investido
+    ,	sum(if(descricao in ('Aplicação RDB', 'Resgate RDB'), valor, 0))*-1 as investido
     ,   sum(if(valor < 0, if(descricao not in ('Aplicação RDB'), valor, 0), 0)) as gastos
     ,   sum(if(valor < 0, valor, 0)) as saida
     ,   sum(valor) as saldo_mes
