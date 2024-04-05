@@ -1,5 +1,6 @@
 import streamlit as st
 import plotly.express as px
+import plotly.graph_objects as go
 import pandas as pd
 import duckdb
 
@@ -23,11 +24,12 @@ df = con.sql(query).fetchdf().sort_values(['mes'])
 df['mes'] = df['mes'].dt.date
 
 meses = list(df['mes'])
-
-mes_tabela = st.sidebar.selectbox('Mês da Tabela', meses, index=len(meses) - 1)
-
 ultimos_meses = meses[-8:]
-meses_graficos = st.sidebar.multiselect('Meses dos Gráficos', meses, default=ultimos_meses)
+
+######################################################################
+
+st.markdown(f'#### Cálculos Diários')
+mes_tabela = st.sidebar.selectbox('Mês - Filtro Cálculos Diários', meses, index=len(meses) - 1)
 
 ######################################################################
 
@@ -65,7 +67,6 @@ df = df[df['mes'] == mes_tabela][['data', 'titulo', 'top', 'valor', 'categoria']
 df = df.style.map(colorir_celula_valor, subset=['valor'])
 df = df.format({'valor': formatar_dinheiro})
 
-st.markdown(f'#### Tabela')
 st.markdown(f'##### Fatura do Mês {mes_tabela}')
 st.dataframe(df, use_container_width=True, hide_index=True,
              column_config={
@@ -81,10 +82,48 @@ st.dataframe(df, use_container_width=True, hide_index=True,
 
 ######################################################################
 
+query = """
+    select 
+        date_trunc('month', data) as mes
+    ,   data
+    ,   count(*) as quantidade
+    ,   abs(sum(valor)) as valor
+    from
+        invoice
+    where
+        1=1 
+        and valor < 0
+    group by 
+        1, 2
+"""
+
+df = con.sql(query).fetchdf().sort_values(['data'])
+df['data'] = df['data'].dt.date
+df['mes'] = df['mes'].dt.date
+
+df = df[df['mes'] == mes_tabela]
+
+st.markdown(f'##### Gastos Diários do Mês {mes_tabela}')
+
+fig = go.Figure()
+
+fig.add_trace(go.Scatter(x=df['data'], y=df['valor'], mode='lines', name='Valor', line=dict(color='#FF6347')))
+
+fig.add_trace(go.Bar(x=df['data'], y=df['quantidade'], name='Quantidade', marker_color='#1E90FF', yaxis='y2', opacity=0.4))
+
+fig.update_layout(
+    yaxis=dict(title='Valor'),
+    yaxis2=dict(title='Quantidade', overlaying='y', side='right'),
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+######################################################################
+
 st.divider()
 
-st.markdown(f'#### Gráficos')
-col1, col2 = st.columns(2)
+st.markdown(f'#### Cálculos Mensais')
+meses_graficos = st.sidebar.multiselect('Meses - Filtro Cálculos Mensais', meses, default=ultimos_meses)
 
 ######################################################################
 
@@ -118,29 +157,37 @@ df_com_total = pd.concat([df, total_df], ignore_index=True)
 style_df = df_com_total.style.map(colorir_celula_valor, subset=['gastos', 'pagamento_fatura', 'saldo_mes'])
 style_df = style_df.format({'gastos': formatar_dinheiro, 'pagamento_fatura': formatar_dinheiro, 'saldo_mes': formatar_dinheiro})
 
-col1.markdown('##### Saldos Mensais')
-col1.dataframe(style_df, use_container_width=True, hide_index=True,
-               column_config={
-                  'mes': 'Mês',
-                  'gastos': 'Gastos',
-                  'pagamento_fatura': 'Pagamento da Fatura',
-                  'saldo_mes': 'Saldo do Mês'
-               })
+st.markdown('##### Saldos Mensais')
+st.checkbox('Use a largura do contêiner', value=False, key='use_container_width')
+st.dataframe(style_df, use_container_width=st.session_state.use_container_width, 
+             hide_index=True,
+             column_config={
+                 'mes': 'Mês',
+                 'gastos': 'Gastos',
+                 'pagamento_fatura': 'Pagamento da Fatura',
+                 'saldo_mes': 'Saldo do Mês'
+                })
+
+######################################################################
+
+col1, col2 = st.columns(2)
 
 ######################################################################
 
 df = df.melt(id_vars=['mes'], var_name='movimentacao', value_name='valor')
 df = df[df['movimentacao'].isin(['gastos', 'pagamento_fatura', 'saldo_mes'])]
-df['movimentacao'] = df['movimentacao'].replace({'gastos': 'Gastos', 'pagamento_fatura': 'Pagamento da Fatura', 'saldo_mes': 'Saldo do Mês'})
+df['movimentacao'] = df['movimentacao'].replace({'gastos': 'Gastos', 
+                                                 'pagamento_fatura': 'Pagamento Fatura', 
+                                                 'saldo_mes': 'Saldo do Mês'})
 df['valor'] = df['valor'].abs()
 
-colors = {'Gastos': '#008080', 'Pagamento da Fatura': '#90EE90', 'Saldo do Mês': '#FFDB99'}
+colors = {'Gastos': '#008080', 'Pagamento Fatura': '#90EE90', 'Saldo do Mês': '#FFDB99'}
 
-col2.markdown('##### Movimentações Mensais')
+col1.markdown('##### Movimentações Mensais')
 fig = px.bar(df, x='mes', y='valor', color='movimentacao', 
              barmode='group', color_discrete_map=colors)
 
-col2.plotly_chart(fig)
+col1.plotly_chart(fig, use_container_width=True)
 
 ######################################################################
 
@@ -159,9 +206,9 @@ df = con.sql(query).fetchdf()
 df['mes'] = df['mes'].dt.date
 df = df[df['mes'].isin(meses_graficos)]
 
-st.markdown('##### Distribuição dos Gastos Mensais')
+col2.markdown('##### Distribuição dos Gastos Mensais')
 fig = px.box(df, x='mes', y='valor', color_discrete_sequence=['#FF6347'])
-st.plotly_chart(fig)
+col2.plotly_chart(fig, use_container_width=True)
 
 ######################################################################
 

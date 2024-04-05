@@ -1,5 +1,6 @@
 import streamlit as st
 import plotly.express as px
+import plotly.graph_objects as go
 import pandas as pd
 import duckdb
 
@@ -23,11 +24,12 @@ df = con.sql(query).fetchdf().sort_values(['mes'])
 df['mes'] = df['mes'].dt.date
 
 meses = list(df['mes'])
-
-mes_tabela = st.sidebar.selectbox('Mês da Tabela', meses, index=len(meses) - 1)
-
 ultimos_meses = meses[-8:]
-meses_graficos = st.sidebar.multiselect('Meses dos Gráficos', meses, default=ultimos_meses)
+
+######################################################################
+
+st.markdown(f'#### Cálculos Diários')
+mes_tabela = st.sidebar.selectbox('Mês - Filtro Cálculos Diários', meses, index=len(meses) - 1)
 
 ######################################################################
 
@@ -67,7 +69,6 @@ df = df.style.map(colorir_celula_valor, subset=['valor', 'valor_acumulado'])
 df = df.format({'valor': formatar_dinheiro, 'valor_acumulado': formatar_dinheiro})
 df = df.map(colorir_celula_investimento, subset=['tipo'])
 
-st.markdown(f'#### Tabela')
 st.markdown(f'##### Extrato do Mês {mes_tabela}')
 st.dataframe(df, use_container_width=True, hide_index=True,
              column_config={
@@ -84,9 +85,49 @@ st.dataframe(df, use_container_width=True, hide_index=True,
 
 ######################################################################
 
+query = """
+    select 
+        date_trunc('month', data) as mes
+    ,   data
+    ,   count(id) as quantidade
+    ,   abs(sum(valor)) as valor
+    from
+        extract
+    where
+        1=1 
+        and valor < 0
+        and descricao not in ('Aplicação RDB')
+    group by 
+        1, 2
+"""
+
+df = con.sql(query).fetchdf().sort_values(['data'])
+df['data'] = df['data'].dt.date
+df['mes'] = df['mes'].dt.date
+
+df = df[df['mes'] == mes_tabela]
+
+st.markdown(f'##### Gastos Diários do Mês {mes_tabela}')
+
+fig = go.Figure()
+
+fig.add_trace(go.Scatter(x=df['data'], y=df['valor'], mode='lines', name='Valor', line=dict(color='#FF6347')))
+
+fig.add_trace(go.Bar(x=df['data'], y=df['quantidade'], name='Quantidade', marker_color='#1E90FF', yaxis='y2', opacity=0.4))
+
+fig.update_layout(
+    yaxis=dict(title='Valor'),
+    yaxis2=dict(title='Quantidade', overlaying='y', side='right'),
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+######################################################################
+
 st.divider()
 
-st.markdown(f'#### Gráficos')
+st.markdown(f'#### Cálculos Mensais')
+meses_graficos = st.sidebar.multiselect('Meses - Filtro Cálculos Mensais', meses, default=ultimos_meses)
 
 ######################################################################
 
@@ -138,7 +179,7 @@ style_df = style_df.format({'entrada': formatar_dinheiro, 'investido': formatar_
                             'saldo_mes': formatar_dinheiro})
 
 st.markdown('##### Saldos Mensais')
-st.checkbox('Use a largura do contêiner', value=True, key='use_container_width')
+st.checkbox('Use a largura do contêiner', value=False, key='use_container_width')
 st.dataframe(style_df, use_container_width=st.session_state.use_container_width, 
              hide_index=True,
              column_config={
