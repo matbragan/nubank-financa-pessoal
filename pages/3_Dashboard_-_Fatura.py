@@ -164,7 +164,7 @@ st.dataframe(style_df, use_container_width=st.session_state.use_container_width,
              column_config={
                  'mes': 'Mês',
                  'gastos': 'Gastos',
-                 'pagamento_fatura': 'Pagamento da Fatura',
+                 'pagamento_fatura': 'Pagamento Fatura',
                  'saldo_mes': 'Saldo do Mês'
                 })
 
