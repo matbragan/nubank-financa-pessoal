@@ -22,11 +22,11 @@ query = """
 df = con.sql(query).fetchdf().sort_values(['mes'])
 df['mes'] = df['mes'].dt.date
 
-meses = df['mes'].unique()
+meses = list(df['mes'])
 
 mes_tabela = st.sidebar.selectbox('Mês da Tabela', meses, index=len(meses) - 1)
 
-ultimos_meses = df['mes'].to_list()[-8:]
+ultimos_meses = meses[-8:]
 meses_graficos = st.sidebar.multiselect('Meses dos Gráficos', meses, default=ultimos_meses)
 
 ######################################################################
@@ -87,7 +87,6 @@ st.dataframe(df, use_container_width=True, hide_index=True,
 st.divider()
 
 st.markdown(f'#### Gráficos')
-col1, col2 = st.columns(2)
 
 ######################################################################
 
@@ -95,6 +94,8 @@ query = """
     select
         date_trunc('month', data) as mes
     ,   sum(if(valor > 0, valor, 0)) as entrada
+    ,	sum(if(descricao in ('Aplicação RDB'), valor, 0))*-1 as aplicado
+    ,	sum(if(descricao in ('Resgate RDB'), valor, 0))*-1 as resgatado
     ,	sum(if(descricao in ('Aplicação RDB', 'Resgate RDB'), valor, 0))*-1 as investido
     ,   sum(if(valor < 0, if(descricao not in ('Aplicação RDB'), valor, 0), 0)) as gastos
     ,   sum(if(valor < 0, valor, 0)) as saida
@@ -110,6 +111,8 @@ df['mes'] = df['mes'].dt.date
 df = df[df['mes'].isin(meses_graficos)]
 
 total_entrada = df['entrada'].sum()
+total_aplicado = df['aplicado'].sum()
+total_resgatado = df['resgatado'].sum()
 total_investido = df['investido'].sum()
 total_gastos = df['gastos'].sum()
 total_saida = df['saida'].sum()
@@ -117,6 +120,8 @@ total_saldo_mes = df['saldo_mes'].sum()
 
 total_df = pd.DataFrame({'mes': ['Total'], 
                           'entrada': [total_entrada], 
+                          'aplicado': [total_aplicado],
+                          'resgatado': [total_resgatado],
                           'investido': [total_investido], 
                           'gastos': [total_gastos], 
                           'saida': [total_saida], 
@@ -125,21 +130,31 @@ total_df = pd.DataFrame({'mes': ['Total'],
 df_com_total = pd.concat([df, total_df], ignore_index=True)
 
 style_df = df_com_total.style.map(colorir_celula_valor, 
-                                  subset=['entrada', 'investido', 'gastos', 'saida', 'saldo_mes'])
-style_df = style_df.format({'entrada': formatar_dinheiro, 'investido': formatar_dinheiro, 
+                                  subset=['entrada', 'aplicado', 'resgatado', 'investido', 
+                                          'gastos', 'saida', 'saldo_mes'])
+style_df = style_df.format({'entrada': formatar_dinheiro, 'investido': formatar_dinheiro,
+                            'aplicado': formatar_dinheiro, 'resgatado': formatar_dinheiro, 
                             'gastos': formatar_dinheiro, 'saida': formatar_dinheiro, 
                             'saldo_mes': formatar_dinheiro})
 
-col1.markdown('##### Saldos Mensais')
-col1.dataframe(style_df, use_container_width=True, hide_index=True,
-               column_config={
-                  'mes': 'Mês',
-                  'entrada': 'Entrada',
-                  'investido': 'Investido',
-                  'gastos': 'Gastos',
-                  'saida': 'Saída',
-                  'saldo_mes': 'Saldo do Mês'
-               })
+st.markdown('##### Saldos Mensais')
+st.checkbox('Use a largura do contêiner', value=True, key='use_container_width')
+st.dataframe(style_df, use_container_width=st.session_state.use_container_width, 
+             hide_index=True,
+             column_config={
+                 'mes': 'Mês',
+                 'entrada': 'Entrada',
+                 'aplicado': 'Aplicado',
+                 'resgatado': 'Resgatado',
+                 'investido': 'Investido',
+                 'gastos': 'Gastos',
+                 'saida': 'Saída',
+                 'saldo_mes': 'Saldo do Mês'
+            })
+
+######################################################################
+
+col1, col2 = st.columns(2)
 
 ######################################################################
 
@@ -151,11 +166,11 @@ df['valor'] = df['valor'].abs()
 
 colors = {'Entrada': '#90EE90', 'Investido': '#FFDB99', 'Gastos': '#008080', 'Saída': '#FF6347'}
 
-col2.markdown('##### Movimentações Mensais')
-fig = px.bar(df, x='mes', y='valor', color='movimentacao', 
+col1.markdown('##### Movimentações Mensais')
+fig = px.bar(df, x='mes', y='valor', color='movimentacao',
              barmode='group', color_discrete_map=colors)
 
-col2.plotly_chart(fig)
+col1.plotly_chart(fig, use_container_width=True)
 
 ######################################################################
 
@@ -175,9 +190,9 @@ df = con.sql(query).fetchdf()
 df['mes'] = df['mes'].dt.date
 df = df[df['mes'].isin(meses_graficos)]
 
-st.markdown('##### Distribuição dos Gastos Mensais')
+col2.markdown('##### Distribuição dos Gastos Mensais')
 fig = px.box(df, x='mes', y='valor', color_discrete_sequence=['#FF6347'])
-st.plotly_chart(fig)
+col2.plotly_chart(fig, use_container_width=True)
 
 ######################################################################
 

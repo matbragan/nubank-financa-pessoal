@@ -22,11 +22,11 @@ query = """
 df = con.sql(query).fetchdf().sort_values(['mes'])
 df['mes'] = df['mes'].dt.date
 
-meses = df['mes'].unique()
+meses = list(df['mes'])
 
 mes_tabela = st.sidebar.selectbox('Mês da Tabela', meses, index=len(meses) - 1)
 
-ultimos_meses = df['mes'].to_list()[-8:]
+ultimos_meses = meses[-8:]
 meses_graficos = st.sidebar.multiselect('Meses dos Gráficos', meses, default=ultimos_meses)
 
 ######################################################################
