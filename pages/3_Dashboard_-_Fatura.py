@@ -114,6 +114,7 @@ fig.add_trace(go.Bar(x=df['data'], y=df['quantidade'], name='Quantidade', marker
 fig.update_layout(
     yaxis=dict(title='Valor'),
     yaxis2=dict(title='Quantidade', overlaying='y', side='right'),
+    xaxis_title='Dia', yaxis_title='Valor'
 )
 
 st.plotly_chart(fig, use_container_width=True)
@@ -163,9 +164,18 @@ st.dataframe(style_df, use_container_width=st.session_state.use_container_width,
              hide_index=True,
              column_config={
                  'mes': 'Mês',
-                 'gastos': 'Gastos',
-                 'pagamento_fatura': 'Pagamento Fatura',
-                 'saldo_mes': 'Saldo do Mês'
+                 'gastos': st.column_config.Column(
+                     'Gastos',
+                     help='Soma de todos os gastos no crédito do mês, valores positivos na fatura'
+                 ),
+                 'pagamento_fatura': st.column_config.Column(
+                     'Pagamento Fatura',
+                     help='Soma de todos os pagamento da fatura no mês, valores negativos na fatura'
+                 ),
+                 'saldo_mes': st.column_config.Column(
+                     'Saldo do Mês',
+                     help='Soma de todos os valores do mês, subtração do Pagamento Fatura com os Gastos'
+                 )
                 })
 
 ######################################################################
@@ -186,7 +196,7 @@ colors = {'Gastos': '#008080', 'Pagamento Fatura': '#90EE90', 'Saldo do Mês': '
 col1.markdown('##### Movimentações Mensais')
 fig = px.bar(df, x='mes', y='valor', color='movimentacao', 
              barmode='group', color_discrete_map=colors)
-
+fig.update_layout(xaxis_title='Mês', yaxis_title='Valor')
 col1.plotly_chart(fig, use_container_width=True)
 
 ######################################################################
@@ -208,6 +218,7 @@ df = df[df['mes'].isin(meses_graficos)]
 
 col2.markdown('##### Distribuição dos Gastos Mensais')
 fig = px.box(df, x='mes', y='valor', color_discrete_sequence=['#FF6347'])
+fig.update_layout(xaxis_title='Mês', yaxis_title='Valor')
 col2.plotly_chart(fig, use_container_width=True)
 
 ######################################################################

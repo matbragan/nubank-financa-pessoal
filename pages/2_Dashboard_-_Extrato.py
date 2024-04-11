@@ -74,12 +74,15 @@ st.dataframe(df, use_container_width=True, hide_index=True,
              column_config={
                 'data': 'Data',
                 'tipo': 'Tipo',
-                'top': st.column_config.TextColumn(
+                'top': st.column_config.Column(
                     'Top 10',
                     help='⭐ indica as 10 transações com maiores valores'
                 ),
                 'valor': 'Valor',
-                'valor_acumulado': 'Valor Acumulado',
+                'valor_acumulado': st.column_config.Column(
+                    'Valor Acumulado',
+                    help='Soma de todos os valores anteriores até então, começando com o primeiro extrato carregado'
+                ),
                 'descricao': 'Descrição'
              })
 
@@ -118,6 +121,7 @@ fig.add_trace(go.Bar(x=df['data'], y=df['quantidade'], name='Quantidade', marker
 fig.update_layout(
     yaxis=dict(title='Valor'),
     yaxis2=dict(title='Quantidade', overlaying='y', side='right'),
+    xaxis_title='Dia', yaxis_title='Valor'
 )
 
 st.plotly_chart(fig, use_container_width=True)
@@ -184,13 +188,34 @@ st.dataframe(style_df, use_container_width=st.session_state.use_container_width,
              hide_index=True,
              column_config={
                  'mes': 'Mês',
-                 'entrada': 'Entrada',
-                 'aplicado': 'Aplicado',
-                 'resgatado': 'Resgatado',
-                 'investido': 'Investido',
-                 'gastos': 'Gastos',
-                 'saida': 'Saída',
-                 'saldo_mes': 'Saldo do Mês'
+                 'entrada': st.column_config.Column(
+                     'Entrada',
+                     help='Soma de toda entrada do mês, valores positivo no extrato'
+                 ),
+                 'aplicado': st.column_config.Column(
+                     'Aplicado',
+                     help='Soma das aplicações RDB (caixinhas)'
+                 ),
+                 'resgatado': st.column_config.Column(
+                     'Resgatado',
+                     help='Soma dos resgates RDB (caixinhas)'
+                 ),
+                 'investido': st.column_config.Column(
+                     'Investido',
+                     help='O que de fato foi investido no mês, subtração do Aplicado com Resgatado'
+                 ),
+                 'gastos': st.column_config.Column(
+                     'Gastos',
+                     help='Soma de todos os gastos do mês, valores negativo no extrato menos as Aplicações'
+                 ),
+                 'saida': st.column_config.Column(
+                     'Saída',
+                     help='Soma de toda saída do mês, valores negativo no extrato, soma dos Gastos com Aplicado'
+                 ),
+                 'saldo_mes': st.column_config.Column(
+                     'Saldo do Mês',
+                     help='Soma de todos os valores do mês, subtração da Entrada com a Saída'
+                 )
             })
 
 ######################################################################
@@ -210,7 +235,7 @@ colors = {'Entrada': '#90EE90', 'Investido': '#FFDB99', 'Gastos': '#008080', 'Sa
 col1.markdown('##### Movimentações Mensais')
 fig = px.bar(df, x='mes', y='valor', color='movimentacao',
              barmode='group', color_discrete_map=colors)
-
+fig.update_layout(xaxis_title='Mês', yaxis_title='Valor')
 col1.plotly_chart(fig, use_container_width=True)
 
 ######################################################################
@@ -233,6 +258,7 @@ df = df[df['mes'].isin(meses_graficos)]
 
 col2.markdown('##### Distribuição dos Gastos Mensais')
 fig = px.box(df, x='mes', y='valor', color_discrete_sequence=['#FF6347'])
+fig.update_layout(xaxis_title='Mês', yaxis_title='Valor')
 col2.plotly_chart(fig, use_container_width=True)
 
 ######################################################################

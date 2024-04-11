@@ -31,7 +31,10 @@ texto = '''
 
     
     2. **Dashboards:**   
-        Com os arquivos carregados e a atualização da base dados feita, será possível ver os cálculos e análises nas 2 páginas de Dashboards:   
+        Com os arquivos carregados e a atualização da base dados feita, será possível ver os cálculos e análises nas 2 páginas de Dashboards.   
+        Nas visualizações de tabelas passe o mouse no nome das coluna para ver mais detalhes sobre elas.   
+
+        Páginas de Dashboards:   
         - **Extrato**:   
             Essa página será responsável por lhe mostrar cálculos e análises referentes ao seu extrato da conta.
         - **Fatura:**   
