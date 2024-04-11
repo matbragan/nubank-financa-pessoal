@@ -13,6 +13,7 @@ def escrever_arquivos(pasta, arquivos):
 
 def listar_arquivos(pasta):
     arquivos = os.listdir(pasta)
+    arquivos = sorted(arquivos, key=lambda x: os.path.basename(x))
     return arquivos
 
 
@@ -25,7 +26,6 @@ def excluir_arquivo(pasta, arquivo):
 def mostrar_arquivos_selecionados(pasta):
     st.markdown('#### Clique no arquivo a ser excluído')
     arquivos = listar_arquivos(pasta)
-    arquivos = sorted(arquivos, key=lambda x: os.path.basename(x))
     for arquivo in arquivos:
         if st.button(f'Excluir arquivo "{arquivo}"'):
             excluir_arquivo(pasta, arquivo)
