@@ -12,6 +12,7 @@ con = duckdb.connect(database='finance.db')
 st.set_page_config(page_title='Extrato da Conta', layout='wide')
 
 ######################################################################
+# Criação dos filtros de meses
 
 query = """
     select distinct
@@ -26,12 +27,16 @@ df['mes'] = df['mes'].dt.date
 meses = list(df['mes'])
 ultimos_meses = meses[-8:]
 
+mes_tabela = st.sidebar.selectbox('Mês - Filtro Cálculos Diários', meses, index=len(meses) - 1)
+meses_graficos = st.sidebar.multiselect('Meses - Filtro Cálculos Mensais', meses, default=ultimos_meses)
+
 ######################################################################
+# Dados diários
 
 st.markdown(f'#### Cálculos Diários')
-mes_tabela = st.sidebar.selectbox('Mês - Filtro Cálculos Diários', meses, index=len(meses) - 1)
 
-######################################################################
+###################################
+# Tabela com todas as movimentações do mês
 
 query = """
     with aux as (
@@ -86,7 +91,8 @@ st.dataframe(df, use_container_width=True, hide_index=True,
                 'descricao': 'Descrição'
              })
 
-######################################################################
+###################################
+# Gráfico de barras/linhas de gastos diários
 
 query = """
     select 
@@ -99,7 +105,8 @@ query = """
     where
         1=1 
         and valor < 0
-        and descricao not in ('Aplicação RDB')
+        and descricao not like '%RDB%'
+        and descricao not like '%CDB%'
     group by 
         1, 2
 """
@@ -121,28 +128,32 @@ fig.add_trace(go.Bar(x=df['data'], y=df['quantidade'], name='Quantidade', marker
 fig.update_layout(
     yaxis=dict(title='Valor'),
     yaxis2=dict(title='Quantidade', overlaying='y', side='right'),
-    xaxis_title='Dia', yaxis_title='Valor'
+    xaxis_title='Dia', yaxis_title='Valor',
+    legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=0.15),
 )
 
 st.plotly_chart(fig, use_container_width=True)
 
 ######################################################################
+# Dados mensais
 
 st.divider()
 
 st.markdown(f'#### Cálculos Mensais')
-meses_graficos = st.sidebar.multiselect('Meses - Filtro Cálculos Mensais', meses, default=ultimos_meses)
 
-######################################################################
+###################################
+# Tabela com valores acumulados dos meses
 
 query = """
     select
         date_trunc('month', data) as mes
+    ,	sum(if(tipo in ('Aplicação RDB', 'Compra de CDB'), valor, 0))*-1 as aplicado
+    ,	sum(if(tipo in ('Resgate RDB'), valor, 0))*-1 as resgatado
+    ,	sum(if(tipo in ('Aplicação RDB', 'Compra de CDB', 'Resgate RDB'), valor, 0))*-1 as investido
+    ,   sum(if(valor > 0 and tipo not in ('Resgate RDB'), valor, 0)) as ganhos
+    ,   sum(if(valor < 0 and tipo not in ('Aplicação RDB', 'Compra de CDB'), valor, 0)) as gastos
+    ,   sum(if(tipo not in ('Aplicação RDB', 'Compra de CDB', 'Resgate RDB'), valor, 0)) as sobras
     ,   sum(if(valor > 0, valor, 0)) as entrada
-    ,	sum(if(descricao in ('Aplicação RDB'), valor, 0))*-1 as aplicado
-    ,	sum(if(descricao in ('Resgate RDB'), valor, 0))*-1 as resgatado
-    ,	sum(if(descricao in ('Aplicação RDB', 'Resgate RDB'), valor, 0))*-1 as investido
-    ,   sum(if(valor < 0, if(descricao not in ('Aplicação RDB'), valor, 0), 0)) as gastos
     ,   sum(if(valor < 0, valor, 0)) as saida
     ,   sum(valor) as saldo_mes
     from 
@@ -155,32 +166,17 @@ df = con.sql(query).fetchdf()
 df['mes'] = df['mes'].dt.date
 df = df[df['mes'].isin(meses_graficos)]
 
-total_entrada = df['entrada'].sum()
-total_aplicado = df['aplicado'].sum()
-total_resgatado = df['resgatado'].sum()
-total_investido = df['investido'].sum()
-total_gastos = df['gastos'].sum()
-total_saida = df['saida'].sum()
-total_saldo_mes = df['saldo_mes'].sum()
+colunas = df.columns.tolist()
+colunas.remove('mes')
 
-total_df = pd.DataFrame({'mes': ['Total'], 
-                          'entrada': [total_entrada], 
-                          'aplicado': [total_aplicado],
-                          'resgatado': [total_resgatado],
-                          'investido': [total_investido], 
-                          'gastos': [total_gastos], 
-                          'saida': [total_saida], 
-                          'saldo_mes': [total_saldo_mes]})
+totais = {coluna: df[coluna].sum() for coluna in colunas}
+
+total_df = pd.DataFrame({'mes': ['Total'], **{coluna: [total] for coluna, total in totais.items()}})
 
 df_com_total = pd.concat([df, total_df], ignore_index=True)
 
-style_df = df_com_total.style.map(colorir_celula_valor, 
-                                  subset=['entrada', 'aplicado', 'resgatado', 'investido', 
-                                          'gastos', 'saida', 'saldo_mes'])
-style_df = style_df.format({'entrada': formatar_dinheiro, 'investido': formatar_dinheiro,
-                            'aplicado': formatar_dinheiro, 'resgatado': formatar_dinheiro, 
-                            'gastos': formatar_dinheiro, 'saida': formatar_dinheiro, 
-                            'saldo_mes': formatar_dinheiro})
+style_df = df_com_total.style.map(colorir_celula_valor, subset=colunas)
+style_df = style_df.format({coluna: formatar_dinheiro for coluna in colunas})
 
 st.markdown('##### Saldos Mensais')
 st.checkbox('Use a largura do contêiner', value=False, key='use_container_width')
@@ -188,29 +184,37 @@ st.dataframe(style_df, use_container_width=st.session_state.use_container_width,
              hide_index=True,
              column_config={
                  'mes': 'Mês',
-                 'entrada': st.column_config.Column(
-                     'Entrada',
-                     help='Soma de toda entrada do mês, valores positivo no extrato'
-                 ),
                  'aplicado': st.column_config.Column(
                      'Aplicado',
-                     help='Soma das aplicações RDB (caixinhas)'
+                     help='Soma das aplicações RDB e CDB'
                  ),
                  'resgatado': st.column_config.Column(
                      'Resgatado',
-                     help='Soma dos resgates RDB (caixinhas)'
+                     help='Soma dos resgates RDB e CDB'
                  ),
                  'investido': st.column_config.Column(
                      'Investido',
                      help='O que de fato foi investido no mês, subtração do Aplicado com Resgatado'
                  ),
+                 'ganhos': st.column_config.Column(
+                     'Ganhos',
+                     help='Soma de todos os ganhos do mês, valores positivos no extrato, tirando RDB e CDB'
+                 ),
                  'gastos': st.column_config.Column(
                      'Gastos',
-                     help='Soma de todos os gastos do mês, valores negativo no extrato menos as Aplicações'
+                     help='Soma de todos os gastos do mês, valores negativos no extrato, tirando RDB e CDB'
+                 ),
+                 'sobras': st.column_config.Column(
+                     'Sobras',
+                     help='O que sobrou no mês, subtração dos Ganhos com os Gastos'
+                 ),
+                 'entrada': st.column_config.Column(
+                     'Entrada',
+                     help='Soma de toda entrada do mês, valores positivos no extrato'
                  ),
                  'saida': st.column_config.Column(
                      'Saída',
-                     help='Soma de toda saída do mês, valores negativo no extrato, soma dos Gastos com Aplicado'
+                     help='Soma de toda saída do mês, valores negativos no extrato'
                  ),
                  'saldo_mes': st.column_config.Column(
                      'Saldo do Mês',
@@ -218,27 +222,34 @@ st.dataframe(style_df, use_container_width=st.session_state.use_container_width,
                  )
             })
 
-######################################################################
+###################################
+# Divisão dos 2 próximos gráficos em 2 colunas
 
 col1, col2 = st.columns(2)
 
-######################################################################
-
-df = df.melt(id_vars=['mes'], var_name='movimentacao', value_name='valor')
-df = df[df['movimentacao'].isin(['entrada', 'investido', 'gastos', 'saida'])]
-df['movimentacao'] = df['movimentacao'].replace({'entrada': 'Entrada', 'investido': 'Investido', 
-                                                 'gastos': 'Gastos', 'saida': 'Saída'})
-df['valor'] = df['valor'].abs()
-
-colors = {'Entrada': '#90EE90', 'Investido': '#FFDB99', 'Gastos': '#008080', 'Saída': '#FF6347'}
+###################################
+# Grafico 1 - Gráfico de barras com alguns valores acumulados do mês
 
 col1.markdown('##### Movimentações Mensais')
+
+df = df.melt(id_vars=['mes'], var_name='movimentacao', value_name='valor')
+df = df[df['movimentacao'].isin(['investido', 'ganhos', 'gastos', 'sobras'])]
+df['movimentacao'] = df['movimentacao'].replace({'investido': 'Investido', 'ganhos': 'Ganhos', 
+                                                 'gastos': 'Gastos', 'sobras': 'Sobras'})
+
+col1.checkbox('Normalizar valores para positivos', value=False, key='normalizar_valores')
+if st.session_state.normalizar_valores:
+    df['valor'] = df['valor'].abs()
+
+colors = {'Investido': '#FFDB99', 'Ganhos': '#90EE90', 'Gastos': '#FF6347', 'Sobras': '#008080'}
+
 fig = px.bar(df, x='mes', y='valor', color='movimentacao',
              barmode='group', color_discrete_map=colors)
 fig.update_layout(xaxis_title='Mês', yaxis_title='Valor')
 col1.plotly_chart(fig, use_container_width=True)
 
-######################################################################
+###################################
+# Grafico 2 - Boxplot com os gastos do mês
 
 query = """
     select 
@@ -249,7 +260,8 @@ query = """
     where
         1=1 
         and valor < 0
-        and descricao not in ('Aplicação RDB')
+        and descricao not like '%RDB%'
+        and descricao not like '%CDB%'
 """
 
 df = con.sql(query).fetchdf()

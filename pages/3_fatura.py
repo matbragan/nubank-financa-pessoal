@@ -114,7 +114,8 @@ fig.add_trace(go.Bar(x=df['data'], y=df['quantidade'], name='Quantidade', marker
 fig.update_layout(
     yaxis=dict(title='Valor'),
     yaxis2=dict(title='Quantidade', overlaying='y', side='right'),
-    xaxis_title='Dia', yaxis_title='Valor'
+    xaxis_title='Dia', yaxis_title='Valor',
+    legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=0.15),
 )
 
 st.plotly_chart(fig, use_container_width=True)

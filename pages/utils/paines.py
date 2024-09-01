@@ -14,5 +14,7 @@ def colorir_celula_valor(valor):
 
 
 def colorir_celula_investimento(tipo):
-    if tipo in ('Aplicação RDB', 'Resgate RDB'):
-        return 'background-color: rgba(255, 255, 0, 0.3)'
+    if tipo in ['Aplicação RDB', 'Compra de CDB']:
+        return 'background-color: rgba(144, 238, 144, 0.3)'
+    if tipo in ['Resgate RDB']:
+        return 'background-color: rgba(255, 160, 122, 0.3)'
